@@ -1,0 +1,148 @@
+- name: Install docker
+  hosts: docker
+  gather_facts: yes
+  become: 'yes'
+
+  tasks:
+
+  - name: Add repo
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Insert hostname
+    shell: hostnamectl set-hostname docker-pgsql
+    become: true
+
+  - name: Add user postgres
+    user:
+      force: true
+      name: postgres
+      groups: wheel
+      create_home: true
+    
+  - name: Add postgres to sudoers
+    lineinfile:
+      dest: /etc/sudoers
+      line: "postgres ALL=(ALL)  NOPASSWD: ALL"
+
+  - name: Add repo for docker
+    shell: yum-config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+    args:
+      creates: /etc/yum.repos.d/docker.repo
+
+  - name: Install docker
+    yum: name={{item}} state=latest
+    with_items:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      - gnupg2
+      - wget
+      - vim
+
+  - name: Start and enable docker
+    service:
+      name: docker
+      state: started
+      enabled: true
+
+  - name: Import a key from a url
+    rpm_key:
+      state: present
+      key: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+
+  - name: Install the postgresql rpm from a remote repo
+    yum:
+      name: https://apt.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm 
+      state: present
+      
+  - name: Update repository
+    shell: yum -y update
+
+  - name: Install build tools
+    yum:
+      name: "@Development tools"
+      state: present
+    become: yes
+
+  - name: Install postgresql
+    yum: name={{item}} state=latest
+    with_items:
+      - postgresql14
+      - postgresql14-server
+      - gcc
+      - openssl-devel
+      - bzip2-devel
+      - libffi-devel
+      - python3-psycopg2
+
+  - name: Check if PostgreSQL is initialized
+    stat:
+      path: "/var/lib/pgsql/14/data/pg_hba.conf"
+    register: postgres_data
+
+  - name: Initialize PostgreSQL
+    shell: "/usr/pgsql-14/bin/postgresql-14-setup initdb"
+    when: not postgres_data.stat.exists
+
+  - name: Start and enable service
+    service:
+      name: postgresql-14
+      state: started
+      enabled: true
+
+  - name: Install pg_hba.conf
+    template:
+      src:  pg_hba.conf.j2
+      dest: /var/lib/pgsql/14/data/pg_hba.conf
+      mode: '0644'
+    notify: restart postgesql
+
+  - name: Install requests python package
+    pip:
+      name: requests
+    vars:
+      ansible_python_interpreter: /usr/bin/python3
+  
+  - name: Creates directory for conf file
+    file:
+      path: /srv/app/conf/
+      state: directory
+
+  - name: Add web.conf
+    template:
+      src:  web.conf.j2
+      dest: /srv/app/conf/web.conf
+      mode: '0644'
+
+  - name: Add python code
+    template:
+      src:  web.py.j2
+      dest:  /srv/app/web.py
+      mode: '0644'
+
+  - name: Add Dokerfile
+    template:
+      src:  Dockerfile.j2
+      dest:  /srv/app/Dockerfile
+      mode: '0644'
+
+  - name: Add Reguirements
+    template:
+      src:  requirements.txt.j2
+      dest:  /srv/app/requirements.txt
+      mode: '0644'
+
+  - name: Download python3
+    shell: |
+      cd /srv/app/
+      docker build ./ --no-cache -t python01:mypy
+      docker run -d --network=host -v /srv/app:/app/ python01:mypy
+
+
+  handlers:
+    - name: restart postgesql
+      service: name=postgesql state=restarted

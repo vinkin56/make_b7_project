@@ -1,0 +1,2 @@
+[docker]
+docker-pgsql  ansible_host=158.160.56.9 ansible_user=vinkin ansibli_ssh_private_key_file=/home/sorokinav/.ssh/vinkin

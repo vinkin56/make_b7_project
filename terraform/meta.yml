@@ -1,0 +1,8 @@
+#cloud-config
+users:
+  - name: vinkin
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh-authorized-keys:
+      - ssh-rsa ЫУФВФУЦЫАФЫВАСФЫВАЫВИРЕВНРУКЕЫМФЫВМВРОКЕВРИМЫУАВМВНРЕНРЕНВИМЫВУЫЕКМВАПТЕШНтевнтвпикеы%;:;:МНП;%4ем4544мСЦУМ sorokinav@server01.localdomain
